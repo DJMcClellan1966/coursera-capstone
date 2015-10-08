@@ -1,0 +1,24 @@
+---
+title: "capstone2"
+author: "DJM"
+date: "October 8, 2015"
+output: html_document
+---
+
+```{r}
+
+setwd("~/R/capstone/capstone")
+rm(list = ls())
+
+library(jsonlite)
+
+yelp.business <- fromJSON(sprintf("[%s]", paste(readLines("yelp_academic_dataset_business.json"),                                               collapse = ",")))
+
+library(dplyr)
+
+names(yelp.business)
+view(yelp.business)
+
+yb <- select(yelp.business, categories, stars,review_count, attributes)
+view(yb)
+```
