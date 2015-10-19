@@ -1,0 +1,268 @@
+---
+title: "Untitled"
+author: "DJM"
+date: "October 14, 2015"
+output: html_document
+---
+```{r}
+setwd("~/R/capstone/capstone")
+rm(list = ls())
+library(rjson)
+
+path <- "yelp_academic_dataset_checkin.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 25000)
+ch <- lapply(X=lines, fromJSON)
+
+path <-"yelp_academic_dataset_business.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 25000)
+bus <- lapply(X=lines, fromJSON)
+
+path <-  "yelp_academic_dataset_tip.json" 
+con <- file(path, "r")
+lines <- readLines(con, n = 25000)
+tips <- lapply(X=lines, fromJSON)
+
+path <-  "yelp_academic_dataset_user.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 25000)
+user <- lapply(X=lines, fromJSON)
+
+path <- "yelp_academic_dataset_review.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 25000)         
+review <- lapply(X = lines, fromJSON)
+
+jsearch <- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info <- list(obj$business_id,
+                   obj$categories,
+                   obj$stars,
+                   obj$review_count,
+                   obj$state)
+   
+      return(info)
+      break
+    }
+  }
+}
+
+
+df <- data.frame(businesss_id = as.character(),
+                  category = as.character(),
+                 stars = as.numeric(),
+                 review_count = as.numeric(),
+                 state = as.character())
+                
+
+i <- 1
+j <- 1
+for(d in bus){
+  
+  business_id<- as.character(jsearch(bus, d[[1]])[1])
+  category <- as.character(jsearch(bus, d[[1]])[2])
+  stars <- as.numeric(jsearch(bus, d[[1]])[3])
+  review_count <- as.numeric(jsearch(bus, d[[1]])[4])
+  state <- as.character(jsearch(bus, d[[1]])[5])
+  
+  
+    entry <- data.frame(business_id,
+                        category,
+                        stars,
+                        review_count,
+                        state)
+    
+    df <- rbind(df, entry)
+    i <- i + 1
+    print(i)
+  
+  print(paste("business processed..!", j))
+  j <- j + 1
+}
+
+write.csv(df, file = "yelp_business.csv", row.names = F)
+
+yb<- read.csv("yelp_business.csv")
+head(yb)
+tail(yb)
+```
+
+```{r}
+jsearch1<- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info1 <- list(obj$business_id,
+                    obj$text,
+                    obj$user_id,
+                    obj$likes)
+                   
+   
+      return(info1)
+      break
+    }
+  }
+}
+
+df1 <- data.frame(businesss_id = as.character(),
+                  tip <- as.character(),
+                  user_id <- as.character(),
+                  likes <- as.numeric())
+                  
+
+k <- 1
+l <- 1
+for(d in tips){
+  
+  business_id<- as.character(jsearch1(tips, d[[3]])[1])
+  tip <- as.character(jsearch1(tips, d[[3]])[2])
+  user_id <- as.character(jsearch1(tips, d[[3]])[3])
+  likes <- as.numeric(jsearch1(tips, d[[3]])[4])
+  
+    entry1 <- data.frame(business_id,
+                         tip,
+                         user_id,
+                         likes)
+                        
+    
+    df1 <- rbind(df1, entry1)
+    k <- k + 1
+    print(k)
+  
+  print(paste("business processed..!", l))
+  l <- l + 1
+}
+
+write.csv(df1, file = "yelp_tips.csv", row.names = F)
+
+yt<- read.csv("yelp_tips.csv")
+head(yt)
+tail(yt)
+
+```
+
+
+```{r}
+jsearch2<- function(json, uid){
+  for(obj in json){
+    if(obj$user_id == uid){
+      info2 <- list(obj$user_id,
+                    obj$votes,
+                    obj$average_stars)
+                    
+      return(info2)
+      break
+    }
+  }
+}
+
+df2 <- data.frame(user_id = as.character(),
+                  votes = as.character(),
+                  average_stars = numeric())
+
+
+m <- 1
+n <- 1
+for(e in user){
+
+  user_id<- as.character(jsearch2(user, e[[5]])[1])
+  votes <- as.character(jsearch2(user, e[[5]])[2])
+  average_stars <- as.numeric(jsearch2(user, e[[5]])[3])
+  
+    entry2 <- data.frame(user_id,
+                         votes,
+                         average_stars)
+                         
+                        
+    
+    df2<- rbind(df2, entry2)
+    m <- m + 1
+    print(m)
+  
+  print(paste("user processed..!", n))
+  n <- n + 1
+}
+
+write.csv(df2, file = "yelp_user.csv", row.names = F)
+
+yu<- read.csv("yelp_user.csv")
+head(yu)
+tail(yu)
+                
+```
+
+```{r}
+jsearch3 <- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info3 <- list(obj$business_id,
+                    obj$stars,
+                    obj$type,
+                    obj$text)
+   
+      return(info3)
+      break
+    }
+  }
+}
+
+
+df3 <- data.frame(businesss_id = as.character(),
+                  stars = as.numeric(),
+                  type = as.character(),
+                  text = as.character())
+                
+
+o <- 1
+p <- 1
+for(f in review){
+  
+  business_id<- as.character(jsearch3(review, f[[8]])[1])
+  stars <- as.numeric(jsearch3(review, f[[8]])[2])
+  type <- as.character(jsearch3(review, f[[8]])[3])
+  text <- as.character(jsearch3(review, f[[8]])[4])
+  
+  
+    entry3 <- data.frame(business_id,
+                         stars,
+                         type,
+                         text)
+    
+    df3 <- rbind(df3, entry3)
+    o <- o + 1
+    print(o)
+  
+  print(paste("business processed..!", p))
+  p <- p + 1
+}
+
+write.csv(df3, file = "yelp_review.csv", row.names = F) 
+
+yr<- read.csv("yelp_review.csv")
+head(yr)
+tail(yr)
+```
+
+##Naive Bayes
+```{r}
+library(dplyr)
+yreview <- arrange(yr, business_id)
+yr1 <- select(yr, -(business_id), -(type))
+            
+yr1$stars <- factor
+table(yr1$stars)
+
+library(tm)
+yreview_corpus <- Corpus(VectorSource(yr1$text))
+
+corpus_clean <- tm_map(yreview_corpus, tolower)
+corpus_clean <- tm_map(corpus_clean, removeNumbers)
+corpus_clean <- tm_map(corpus_clean,removeWords, stopwords())
+corpus_clean <- tm_map(corpus_clean, removePunctuation)
+corpus_clean <- tm_map(corpus_clean, stripWhitespace)
+
+yreview_dtm <- DocumentTermMatrix(corpus_clean)
+
+```
+
