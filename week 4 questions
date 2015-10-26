@@ -1,0 +1,169 @@
+---
+title: "more yelp"
+author: "DJM"
+date: "October 26, 2015"
+output: html_document
+---
+
+#Get Data
+```{r}
+setwd("~/R/capstone/capstone")
+rm(list = ls())
+library(rjson)
+library(dplyr)
+
+path <- "yelp_academic_dataset_checkin.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 10000)
+ch <- lapply(X=lines, fromJSON)
+
+checkin.df <- do.call(rbind, lapply(ch, as.data.frame))
+write.csv(checkin.df, "~/checkin.csv")
+
+
+path <-"yelp_academic_dataset_business.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 15000)
+bus <- lapply(X=lines, fromJSON)
+
+business.df <- do.call(rbind, lapply(bus, as.data.frame))
+write.csv(business.df, "~/business.csv")
+
+path <-  "yelp_academic_dataset_tip.json" 
+con <- file(path, "r")
+lines <- readLines(con, n = 15000)
+tips <- lapply(X=lines, fromJSON)
+
+tips.df <- do.call(rbind, lapply(tips, as.data.frame))
+write.csv(tips.df, "~/tips.csv")
+
+path <-  "yelp_academic_dataset_user.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 15000)
+user <- lapply(X=lines, fromJSON)
+
+jsearch2<- function(json, uid){
+  for(obj in json){
+    if(obj$user_id == uid){
+      info2 <- list(obj$user_id,
+                    obj$votes,
+                    obj$average_stars,
+                    obj$review_count,
+                    obj$friends)
+                    
+      return(info2)
+      break
+    }
+  }
+}
+
+
+df2 <- data.frame(user_id = as.character(),
+                  votes = as.character(),
+                  average_stars = as.numeric(),
+                  review_count = as.numeric(),
+                  friends = as.character())
+
+
+m <- 1
+n <- 1
+for(e in user){
+
+  user_id<- as.character(jsearch2(user, e[[5]])[1])
+  votes <- as.character(jsearch2(user, e[[5]])[2])
+  average_stars <- as.numeric(jsearch2(user, e[[5]])[3])
+  review_count <- as.numeric(jsearch2(user, e[[5]])[4])
+  friends <- as.character(jsearch2(user, e[[5]])[5])
+  
+    entry2 <- data.frame(user_id,
+                         votes,
+                         average_stars,
+                         review_count,
+                         friends)
+                         
+                        
+    
+    df2<- rbind(df2, entry2)
+    m <- m + 1
+    print(m)
+  
+  print(paste("user processed..!", n))
+  n <- n + 1
+}
+
+write.csv(df2, file = "yelp_user.csv")
+user<- read.csv("yelp_user.csv")
+
+
+path <- "yelp_academic_dataset_review.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 15000)         
+review <- lapply(X = lines, fromJSON)
+
+review.df <- do.call(rbind, lapply(review, as.data.frame))
+write.csv <- ("~/review.csv")
+```
+
+#analysis
+```{r}
+library(tm)
+review.list <- review.df$text
+review_corpus <- Corpus(VectorSource(review.list))
+review_corpus <- tm_map(review_corpus, tolower)
+review_corpus <- tm_map(review_corpus, removePunctuation)
+review_corpus <- tm_map(review_corpus,
+                        function(x) removeWords(x, stopwords()))
+corpus_clean <- tm_map(review_corpus, PlainTextDocument)
+
+
+library(wordcloud)
+wordcloud(corpus_clean, min.freq = 30)
+
+review.dtm <- TermDocumentMatrix(corpus_clean)
+review.dtm
+findFreqTerms(review.dtm, lowfreq = 10)
+findAssocs(review.dtm, 'yummy', .50)
+reviewed.tdm <- removeSparseTerms(review.dtm, sparse =0.92)
+review_scale <- scale(reviewed.tdm)
+review.dist <- dist(review_scale,
+                    method = "euclidean")
+review.fit <- hclust(review.dist, 
+                     method = "ward.D2")
+plot(review.fit, main = "Clusters: Yelp Reviews")
+groups <- cutree(review.fit, k = 3)
+rect.hclust(review.fit, k = 3, border = 'blue')
+```
+##analyse tips
+```{r}
+library(tm)
+tip.list <- tips.df$text
+tips_corpus <- Corpus(VectorSource(tip.list))
+tips_corpus <- tm_map(tips_corpus, tolower)
+tips_corpus <- tm_map(tips_corpus, removePunctuation)
+tips_corpus <- tm_map(tips_corpus,
+                      function(x) removeWords(x, stopwords()))
+tips_clean <- tm_map(tips_corpus, PlainTextDocument)
+
+library(wordcloud)
+wordcloud(tips_clean, min.freq = 10)
+
+tips.tdm <- TermDocumentMatrix(tips_clean)
+tips.tdm
+findFreqTerms(tips.tdm)
+findFreqTerms(tips.tdm, 'sedona')
+
+tips_removed <- removeSparseTerms(tips.tdm,
+                                  sparse = 0.92)
+
+tips_removed_scale <- scale(tips_removed)
+tips_removed.dist <- dist(tips_removed,
+                          method = "euclidean")
+
+tips_fit <- hclust(tips_removed.dist,
+                   method = 'ward.D2')
+```
+
+```{r}
+
+```
+
