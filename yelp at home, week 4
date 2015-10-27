@@ -1,0 +1,161 @@
+---
+title: "more yelp"
+author: "DJMcClellan"
+date: "October 26, 2015"
+output: html_document
+---
+I am trying to analyse the yelp challenge dataset, I would like to predict the amount of stars from a review or tip.
+
+#Getting and cleaning data
+```{r}
+setwd("~/Desktop/coursera /capstone/yelp_dataset_challenge_academic_dataset") #set directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 25000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(df, file = "yelp_review.csv", row.names = F) #create csv file
+
+```
+#Analysis
+
+```{r}
+library(tm) #package used to word with text
+review_text <- as.list(review.df$text) #create a list of text only
+review_corpus <- Corpus(VectorSource(review_text)) 
+review_corpus <- tm_map(review_corpus,content_transformer(tolower)) #change all letters to lower case
+review_corpus <- tm_map(review_corpus, PlainTextDocument) #need to change data into something to work with 
+review_corpus <- tm_map(review_corpus, removePunctuation) #self explanatory
+remove_corpus <- tm_map(review_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+
+library(wordcloud)
+
+wordcloud(remove_corpus,max.word =300,
+          random.order = FALSE,
+          colors="red") #create wordcloud
+
+review.tdm <- TermDocumentMatrix(remove_corpus)
+review.tdm
+findFreqTerms(review.tdm, lowfreq = 10)
+findAssocs(review.tdm, c("yelpers", "zinho", "yogurt"), c(0.7, 0.75, 0.1))
+sparse.tdm <- removeSparseTerms(review.tdm, sparse = 0.85)
+
+sparse_review_scale <- scale(sparse.tdm)
+review_dist <- dist(sparse_review_scale, method = "euclidean")
+review_fit <- hclust(review_dist, method = "ward.D2")
+plot(review_fit, main = "Cluster - Yelp Review")
+groups <- cutree(review_fit, k = 5)
+rect.hclust(review_fit, k =5, border = "blue")
+
+```
+I need to break up the review data frame by star rating.
+```{r}
+library(dplyr)
+review_stars <- arrange(review.df, stars) # arrange stars in order
+table(review_stars$stars)
+
+worst <- filter(review_stars, stars == 1)
+bad <- filter(review_stars, stars == 2)
+okay <- filter(review_stars, stars == 3)
+better <- filter(review_stars, stars == 4)
+best <- filter(review_stars, stars == 5)
+```
+
+#worst
+```{r}
+library(tm) #package used to word with text
+worst_text <- as.list(worst$text) #create a list of text only
+worst_corpus <- Corpus(VectorSource(worst_text)) 
+worst_corpus <- tm_map(worst_corpus,content_transformer(tolower)) #change all letters to lower case
+worst_corpus <- tm_map(worst_corpus, PlainTextDocument) #need to change data into something to work with 
+worst_corpus <- tm_map(worst_corpus, removePunctuation) #self explanatory
+worst_corpus <- tm_map(worst_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+
+wordcloud(worst_corpus, min.freq= 500,
+          max.words = 300,
+          color = brewer.pal(10,"GnBu"),
+          random.order = FALSE) #create wordcloud
+
+ 
+```
+
+#bad
+```{r}
+library(tm) #package used to word with text
+bad_text <- as.list(bad$text) #create a list of text only
+bad_corpus <- Corpus(VectorSource(bad_text)) 
+bad_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+bad_corpus <- tm_map(bad_corpus, PlainTextDocument) #need to change data into something to work with 
+bad_corpus <- tm_map(bad_corpus, removePunctuation) #self explanatory
+bad_corpus <- tm_map(bad_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+
+wordcloud(bad_corpus, min.freq= 500,
+          max.words = 300,
+          color = brewer.pal(10, 'BuPu'),
+          random.order = FALSE) #create wordcloud
+
+
+```
+#okay
+```{r}
+library(tm) #package used to word with text
+okay_text <- as.list(okay$text) #create a list of text only
+okay_corpus <- Corpus(VectorSource(okay_text)) 
+okay_corpus <- tm_map(okay_corpus,content_transformer(tolower)) #change all letters to lower case
+okay_corpus <- tm_map(okay_corpus, PlainTextDocument) #need to change data into something to work with 
+okay_corpus <- tm_map(okay_corpus, removePunctuation) #self explanatory
+okay_corpus <- tm_map(okay_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+
+wordcloud(okay_corpus, min.freq= 50,
+          max.words = 300,
+          color = brewer.pal(9, "PuBuGn"),
+          random.order = FALSE) #create wordcloud
+
+
+```
+#better
+```{r}
+library(tm) #package used to word with text
+better_text <- as.list(better$text) #create a list of text only
+better_corpus <- Corpus(VectorSource(better_text)) 
+better_corpus <- tm_map(better_corpus,content_transformer(tolower)) #change all letters to lower case
+better_corpus <- tm_map(better_corpus, PlainTextDocument) #need to change data into something to work with 
+better_corpus <- tm_map(better_corpus, removePunctuation) #self explanatory
+better_corpus <- tm_map(better_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+
+wordcloud(better_corpus, min.freq= 50,
+          max.words = 300,
+          color = brewer.pal(10, "YlOrBr"),
+          random.order = FALSE) #create wordcloud
+
+
+```
+
+#Best
+```{r}
+library(tm) #package used to word with text
+best_text <- as.list(best$text) #create a list of text only
+best_corpus <- Corpus(VectorSource(best_text)) 
+best_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+best_corpus <- tm_map(best_corpus, PlainTextDocument) #need to change data into something to work with 
+best_corpus <- tm_map(best_corpus, removePunctuation) #self explanatory
+best_corpus <- tm_map(best_corpus,
+                        function(x) removeWords(x, stopwords())) # remove common words such as 'a'
+ 
+wordcloud(best_corpus, min.freq= 500,
+          max.word = 300,
+          color =  brewer.pal(8, "Dark2"),
+          random.order = FALSE) #create wordcloud
+
+
+```
