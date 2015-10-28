@@ -1,0 +1,93 @@
+---
+title: "Untitled"
+author: "DJM"
+date: "October 28, 2015"
+output: html_document
+---
+I am trying to analyse the yelp challenge dataset, I would like to predict the amount of stars from a review or tip.
+
+#Getting and cleaning data
+```{r}
+setwd("~/R/capstone/capstone") #set directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 25000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+library(dplyr)
+mutated_stars <- mutate(review.df,
+                        total.votes = votes.funny +
+                                      votes.useful +
+                                      votes.cool )
+selected_stars <- select(mutated_stars,
+                         total.votes,
+                         stars,
+                         text)
+
+plot(selected_stars)
+table(selected_stars$stars)
+
+star_corpus <- Corpus(VectorSource(selected_stars$text))
+inspect(star_corpus[1:3])
+ 
+star_clean <- tm_map(star_corpus,content_transformer(tolower)) #change all letters to lower case
+star_clean <- tm_map(star_clean, PlainTextDocument) #need to change data into something to work with 
+star_clean <- tm_map(star_clean,removeNumbers)
+star_clean <- tm_map(star_clean, removePunctuation) #self explanatory
+star_clean <- tm_map(star_clean,
+                        function(x) removeWords
+(x, stopwords(kind = 'en'))) # remove common words such as 'a'
+star_clean <- tm_map(star_clean, stripWhitespace)
+star_dtm <- DocumentTermMatrix(star_clean)
+star <- inspect(DocumentTermMatrix(star_clean,
+        list(dictionary = findFreqTerms
+             (star_dtm, 500))))
+
+raw_train <- selected_stars[1:3750,]
+raw_test <- selected_stars[3751:5000,]
+
+star_dtm_train <- star[1:3750,]
+star_dtm_test <- star[3751:5000,]
+
+corpus_train <- star_clean[1:3750]
+corpus_test <- star_clean[3751:5000]
+
+prop.table(table(raw_train$stars))
+prop.table(table(raw_test$stars))
+
+findFreqTerms(star_dtm, 500)
+findAssocs(star_dtm, 'food', 0.8)
+head(inspect(removeSparseTerms(star_dtm, 0.4)))
+ 
+convert_counts <- function(x){
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1),
+              labels = c('"No"', '"Yes"'))
+  return(x)
+}
+
+star_train <- apply(star_dtm_train, MARGIN = 2,
+                      convert_counts)
+star_test <- apply(star_dtm_test, MARGIN = 2,
+                   convert_counts)
+library(e1071)
+star_classifier <- naiveBayes(star_train,
+                              raw_train$stars,
+                              laplace = 1)
+star_test_predict <- predict(star_classifier,
+                             star_test)
+library(gmodels)
+CrossTable(star_test_predict,
+           raw_test$stars,
+           prop.chisq = FALSE,
+           prop.t = FALSE,
+           dnn = c("predicted", "actual"))
+
+```
