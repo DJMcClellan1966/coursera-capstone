@@ -1,0 +1,100 @@
+---
+title: "using tm"
+author: "DJM"
+date: "October 29, 2015"
+output: html_document
+---
+Using TM package vignette
+```{r}
+setwd("~/R/capstone/capstone") #set directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 25000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+str(review.df)
+
+library(dplyr)
+mutated_stars <- mutate(review.df,
+                        total.votes = votes.funny +
+                                      votes.useful +
+                                      votes.cool )
+selected_stars <- select(mutated_stars,
+                         total.votes,
+                         stars,
+                         text)
+
+selected_stars$stars <- as.factor(selected_stars$stars)
+
+str(selected_stars$stars)
+table(selected_stars$stars)
+
+
+library(tm)
+review.corpus <-Corpus(VectorSource(review.df$text))
+print(review.corpus)
+inspect(review.corpus[1:2])
+meta(review.corpus[[2]])
+
+lapply(review.corpus[1:2], as.character)
+review_clean <- tm_map(review.corpus, stripWhitespace)
+review_clean <- tm_map(review_clean,
+                       content_transformer(tolower))
+review_clean <- tm_map(review_clean, removePunctuation) #self explanatory
+review_clean <- tm_map(review_clean,removeNumbers)
+review_clean <- tm_map(review_clean, removeWords,
+                       stopwords("english"))
+review_clean <- tm_map(review_clean, stemDocument)#don't use it is here for example
+lapply(review_clean[1:2], as.character)
+
+review_tdm <- TermDocumentMatrix(review_clean)
+inspect(review_tdm)
+
+stars_raw_train <- selected_stars[1:3750,]
+stars_raw_test <- selected_stars[3751:5000,]
+                                 
+review_tdm_train <- review_tdm[1:3750,]
+review_tdm_test <- review_tdm[3751:5000,]
+
+corpus_train <- review_clean[1:3750]
+corpus_test <- review_clean[3751:5000]
+```
+#wordcloud
+```{r}
+library(wordcloud)
+wordcloud(corpus_train, max.words = 40,
+          random.order = FALSE,
+          random.color = TRUE)
+```
+
+#Data Preparation
+```{r}
+freq.term <- findFreqTerms(review_tdm, lowfreq = 5, highfreq = 500)
+head(freq.term)
+tail(freq.term)
+
+review_train <- TermDocumentMatrix(corpus_train,
+                                   list(dictionary = freq.term))
+review_test <- TermDocumentMatrix(corpus_test,
+                                  list(dictionary = freq.term))
+
+convert_counts <- function(x){
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1),
+              labels = c('"No"', '"Yes"'))
+  return(x)
+}
+
+review_train <- apply(review_train,MARGIN = 1,
+                      convert_counts)
+review_test <- apply(review_test, MARGIN = 1,
+                     convert_counts)
+```
+
