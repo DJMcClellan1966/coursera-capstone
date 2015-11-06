@@ -1,0 +1,198 @@
+---
+title: "Untitled"
+author: "DJM"
+date: "November 4, 2015"
+output: html_document
+---
+
+```{r}
+
+setwd("~/R/capstone/capstone") #set directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 15000)  #read data as lines since it is so large only read 25000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+str(review.df)
+library(tm)
+review_list <- review.df$text
+corpus <- Corpus(VectorSource(review_list))
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, PlainTextDocument) #need to change data into something to work with 
+corpus <- tm_map(corpus, removePunctuation) #self explanatory
+corpus <- tm_map(corpus,
+                        function(x) removeWords(x, stopwords("SMART"))) # remove common words such as 'a'
+
+library(wordcloud)
+wordcloud(corpus, max.words = 50)
+
+corpus.tdm <- TermDocumentMatrix(corpus)
+corpus.tdm
+
+findFreqTerms(corpus.tdm,
+              lowfreq = 5000,
+              highfreq = Inf)
+findAssocs(corpus.tdm, 'service', 0.10)
+
+corpus.tdm <- removeSparseTerms(corpus.tdm, 
+                                sparse = 0.90)
+corpus.scale <- scale(corpus.tdm)
+corpus.dist <- dist(corpus.scale,
+                    method = "euclidean")
+corpus.fit <- hclust(corpus.dist,
+                     method = 'complete')
+plot(corpus.fit, main = "Cluster - Corpus")
+groups <- cutree(corpus.fit, k=26, h=5)
+rect.hclust(corpus.fit, k=6, border = 'blue')
+
+
+```
+
+##Sentiment analysis
+```{r}
+https_function <- function(url, ...) {
+  # load package
+  require(RCurl)
+  
+  # parse and evaluate each .R script
+  sapply(c(url, ...), function(u) {
+    eval(parse(text = getURL(u, followlocation = TRUE, cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"))), envir = .GlobalEnv)
+  })
+}
+
+score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
+{
+	require(plyr)
+	require(stringr)
+
+	scores = laply(sentences, function(sentence, pos.words, neg.words) {
+    
+		word.list = str_split(sentence, '\\s+')
+		words = unlist(word.list)
+    
+		pos.matches = match(words, pos.words)
+		neg.matches = match(words, neg.words)
+	
+		pos.matches = !is.na(pos.matches)
+		neg.matches = !is.na(neg.matches)
+
+		score = sum(pos.matches) - sum(neg.matches)
+
+		return(score)
+	}, pos.words, neg.words, .progress=.progress )
+
+	scores.df = data.frame(score=scores, text=sentences)
+	return(scores.df)
+}
+
+url <- 'https://github.com/SocialMediaMininginR/neg_words/blob/master/negative-words.txt'
+fileurl <- "https://github.com/SocialMediaMininginR/neg_words/blob/master/LoughranMcDonald_neg.csv"
+Url <- "https://github.com/SocialMediaMininginR/pos_words/blob/master/positive-words.txt"
+fileUrl <- "https://github.com/SocialMediaMininginR/pos_words/blob/master/LoughranMcDonald_pos.csv"
+
+download.file(url,destfile ="C:/Users/dm4892/Documents/R/capstone/capstone/neg_words.txt")
+
+download.file(fileurl,destfile ="C:/Users/dm4892/Documents/R/capstone/capstone/LoughranMcDonald_neg.txt")
+
+download.file(Url,destfile ="C:/Users/dm4892/Documents/R/capstone/pos_words.txt")
+
+
+download.file(fileUrl,destfile ="C:/Users/dm4892/Documents/R/capstone/capstone/LoughranMcDonald_pos.txt")
+
+pos <- scan(file = "pos_words",
+            what = "character", comment.char = ';')
+pos_lm <- scan(file ="LoughranMcDonald_pos.txt", what = 'character', comment.char = ';' )
+
+neg <- scan(file = "neg_words.txt", what = 'character', comment.char = ';')
+
+neg_lm <- scan(file = "LoughranMcDonald_neg.txt", what = 'character', comment.char = ';')
+
+pos_all <- c(pos, pos_lm)
+neg_all <- c(neg, neg_lm)
+
+colnames(review.df)
+library(reshape)
+cast(review.df, stars~date, length)
+
+bad <- is.na(review.df)
+review.df[bad]
+
+review.df$text <- gsub("[[:punct:]]", ' ', review.df$text)
+review.df$text <- gsub("[[:cntrl:]]", ' ', review.df$text)
+review.df$text <- gsub("\\d+", ' ', review.df$text)
+
+review.text <- as.data.frame(review.df$text)
+review.text$date <- review.df$date
+review.text$date <- as.Date( paste(review.df$date,
+                                   sep = "-") ,
+                             format =  '%Y-%m-%d')
+review.text$date <- strptime(as.character(review.text$date),
+                             "%Y-%m-%d")
+colnames(review.text) <- c("text", "date")
+colnames(review.text)
+
+library(tm)
+
+review_corpus <- Corpus(VectorSource(review.text))
+getTransformations()
+review_corpus <- tm_map(review_corpus,content_transformer(tolower))
+library(SnowballC)
+review.text_stem <- tm_map(review_corpus, stemDocument)
+stnd.stopwords <- stopwords("SMART")
+review.stopwords <- c(stnd.stopwords,"pittsburgh", "Ive",
+                      "Dr", "DR", "Goldberg","Eric")
+review.tf <- list(weighting = weightTf, stopwords = review.stopwords,
+                  removePunctuation = TRUE,
+                  tolower = TRUE,
+                  minWordLength = 4,
+                  removeNumbers = TRUE)
+
+review.tdm <- TermDocumentMatrix(review_corpus, control = review.tf)
+dim(review.tdm)
+review.tdm
+class(review.tdm)
+Terms(review.tdm)
+
+review.frequent <- sort(rowSums(as.matrix(review.tdm)),
+                        decreasing = TRUE)
+
+sum(review.frequent)
+review.frequent[1:50]
+
+findFreqTerms(review.tdm, lowfreq = 60)
+findAssocs(review.tdm, 'experience', 0.5)
+findAssocs(review.tdm, 'made', 0.5)
+findAssocs(review.tdm, 'food', 0.5)
+
+review.95 <- removeSparseTerms(review.tdm, 0.95)
+review.rsums <- sort(rowSums(as.matrix(review.95)),
+                     decreasing = TRUE)
+review.rsums.df <- data.frame(word = names(review.rsums),
+                              freq = review.rsums)
+colnames(review.rsums.df)
+
+library(wordcloud)
+library(RColorBrewer)
+palette <- brewer.pal(9, "BuGn")
+palette <- palette[-(1:2)]
+
+png(filename = "C:/Users/dm4892/Documents/R/capstone/capstone/review.png")
+review_wordcloud <- wordcloud(review.rsums.df$word,
+                              review.rsums.df$freq,
+                              scale = c(7, .2),
+                              min.freq = 4,
+                              max.words = 100,
+                              random.order = FALSE,
+                              color = palette)
+dev.off()
+```
+
+
+
