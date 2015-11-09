@@ -1,0 +1,336 @@
+---
+title: "Untitled"
+author: "DJM"
+date: "November 3, 2015"
+output: html_document
+---
+```{r}
+setwd("~/R/capstone/capstone") #set directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 25000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+path <-"yelp_academic_dataset_business.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 5000)
+bus <- lapply(X=lines, fromJSON)
+class(bus)
+length(bus)
+
+
+jsearch <- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info <- list(obj$business_id,
+                   obj$name,
+                   obj$categories,
+                   obj$stars,
+                   obj$review_count,
+                   obj$state)
+   
+      return(info)
+      break
+    }
+  }
+}
+
+
+df <- data.frame(businesss_id = as.character(),
+                 names = as.character(),
+                  category = as.character(),
+                 stars = as.numeric(),
+                 review_count = as.numeric(),
+                 state = as.character())
+                
+
+i <- 1
+j <- 1
+for(d in bus){
+  
+  business_id<- as.character(jsearch(bus, d[[1]])[1])
+  names <- as.character(jsearch(bus, d[[1]])[2])
+  category <- as.character(jsearch(bus, d[[1]])[3])
+  stars <- as.numeric(jsearch(bus, d[[1]])[4])
+  review_count <- as.numeric(jsearch(bus, d[[1]])[5])
+  state <- as.character(jsearch(bus, d[[1]])[6])
+  
+  
+    entry <- data.frame(business_id,
+                        names,
+                        category,
+                        stars,
+                        review_count,
+                        state)
+    
+    df <- rbind(df, entry)
+    i <- i + 1
+    print(i)
+  
+  print(paste("business processed..!", j))
+  j <- j + 1
+}
+
+write.csv(df, file = "yelp_business.csv", row.names = F)
+
+business.df<- read.csv("yelp_business.csv")
+
+
+
+path <-  "yelp_academic_dataset_tip.json" 
+con <- file(path, "r")
+lines <- readLines(con, n = 5000)
+tips <- lapply(X=lines, fromJSON)
+
+tips.df <- do.call(rbind, lapply(tips, as.data.frame))
+write.csv(tips.df, "~/tips.csv")
+
+
+path <-  "yelp_academic_dataset_user.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 5000)
+user <- lapply(X=lines, fromJSON)
+
+jsearch2<- function(json, uid){
+  for(obj in json){
+    if(obj$user_id == uid){
+      info2 <- list(obj$user_id,
+                    obj$votes,
+                    obj$average_stars,
+                    obj$review_count,
+                    obj$friends)
+                    
+      return(info2)
+      break
+    }
+  }
+}
+
+
+df2 <- data.frame(user_id = as.character(),
+                  votes = as.character(),
+                  average_stars = as.numeric(),
+                  review_count = as.numeric(),
+                  friends = as.character())
+
+
+m <- 1
+n <- 1
+for(e in user){
+
+  user_id<- as.character(jsearch2(user, e[[5]])[1])
+  votes <- as.character(jsearch2(user, e[[5]])[2])
+  average_stars <- as.numeric(jsearch2(user, e[[5]])[3])
+  review_count <- as.numeric(jsearch2(user, e[[5]])[4])
+  friends <- as.character(jsearch2(user, e[[5]])[5])
+  
+    entry2 <- data.frame(user_id,
+                         votes,
+                         average_stars,
+                         review_count,
+                         friends)
+                         
+                        
+    
+    df2<- rbind(df2, entry2)
+    m <- m + 1
+    print(m)
+  
+  print(paste("user processed..!", n))
+  n <- n + 1
+}
+
+write.csv(df2, file = "yelp_user.csv")
+user.df<- read.csv("yelp_user.csv")
+
+
+```
+
+```{r}
+library(dplyr)
+review2.df <- select(review.df, business_id,
+                     stars, text)
+business2.df <- select(business.df,business_id,
+                       names)
+merge.df <- merge(review2.df, business2.df,
+                 'business_id')
+tip2.df <- select(tips.df, business_id,
+                  tip)
+merge2.df <- merge(merge.df, tip2.df,
+                   'business_id')
+
+merge2.df$stars <- factor(merge2.df$stars,
+                             levels = c('1', '2', '3',
+                                        '4', '5'),
+                             labels = c("one",
+                                        "two",
+                                        "three",
+                                        "four",
+                                        "five"))
+
+names(merge2.df)[names(merge2.df)=="text.x"] <- "review"
+names(merge2.df)[names(merge2.df)=="text.y"] <- "tips"       
+
+                    
+count_bus_id <- count(merge2.df, 
+                      business_id)
+arrange(count_bus_id,desc(n))
+
+data2 <- merge2.df[merge2.df$business_id %in%
+                     c('2Igiyhi82R8_QaaPplRmCw'), ]
+table(data2$stars)
+
+```
+
+#create corpus of data2
+```{r}
+str(data2)
+
+library(tm) #framework for text mining
+library(SnowballC) # provides wordstem()
+library(qdap) #quantitative discourse analysis of transcripts
+library(qdapDictionaries)
+library(dplyr) #data preparation and pipes %>%
+library(RColorBrewer) #palette of colors
+library(ggplot2)
+library(scales)
+library(Rgraphviz)
+
+
+review_list <- data2$text
+corpus <- Corpus(VectorSource(review_list))
+
+toSpace <- content_transformer(function(x, pattern)
+  gsub(pattern, " ", x))
+corpus <- tm_map(corpus, toSpace, "/")
+corpus <- tm_map(corpus, toSpace, "@")
+corpus <- tm_map(corpus, toSpace, "\\|")
+
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, PlainTextDocument) #need to change data into something to work with 
+corpus <- tm_map(corpus, removePunctuation) #self explanatory
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus,
+                        function(x) removeWords(x, stopwords("SMART"))) # remove common words such as 'a'
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, stemDocument)
+
+dtm <- DocumentTermMatrix(corpus)
+dtm
+dim(dtm)
+
+```
+Exploring
+```{r}
+freq <- colSums(as.matrix(dtm))
+length(freq)
+ord <- order(freq)
+#Least frequent terms
+freq[head(ord)]
+#Most frequent terms
+freq[tail(ord)]
+
+head(table(freq), 15)
+tail(table(freq), 15)
+
+m <- as.matrix(dtm)
+dim(m)
+
+write.csv(m, file = "dtm.csv")
+
+dtms <- removeSparseTerms(dtm, 0.9)
+dim(dtms)
+dtms
+freq <- colSums(as.matrix(dtms))
+freq
+table(freq)
+
+findFreqTerms(dtm, lowfreq = 2550)
+findAssocs(dtm, "friend", corlimit = 0.25)
+findAssocs(dtm, "dorstop", corlimit = .4)
+
+plot(dtm, terms = findFreqTerms(dtm, lowfreq = 2550), corThreshold = 0.25)
+```
+Plotting word frequencies
+```{r}
+freq <- sort(colSums(as.matrix(dtm)),
+             decreasing = TRUE)
+head(freq)
+wf <- data.frame(word = names(freq), freq = freq)
+head(wf)
+
+library(ggplot2)
+subset(wf, freq > 2000)%>%
+  ggplot(aes(word, freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+  
+library(wordcloud)
+set.seed(123)
+wordcloud(names(freq), freq, min.freq = 100,
+          colors = brewer.pal(7, "Dark2"))
+
+```
+Quantitative analysis of text with qdap
+```{r}
+library(qdap)
+words <- dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(words)
+head(words)
+summary(nchar(words))
+table(nchar(words))
+dist_tab(nchar(words))
+
+data.frame(nletters = nchar(words))%>%
+  ggplot(aes(x=nletters))+
+  geom_histogram(binwidth = 1)+
+  geom_vline(xintercept = mean(nchar(words)),
+             color = "green", size = 1, alpha = .5)+
+  labs(x = "Number of Letters",
+       y = "Number of Words")
+
+library(dplyr)
+library(stringr)
+words%>%
+  str_split("")%>%
+  sapply(function(x) x[-1])%>%
+  unlist%>%
+  dist_tab%>%
+  mutate(Letter = factor(toupper(interval),
+                         levels = toupper(interval[order(freq)])))%>%
+  ggplot(aes(Letter, weight = percent))+
+  geom_bar()+
+  coord_flip()+
+  ylab("Proportion")+
+  scale_y_continuous(breaks = seq(0, 12, 2),
+                     label = function(x) paste0(x, "%"),
+                     expand = c(0,0), limits = c(0,12))
+
+#heatmap
+words%>%
+  lapply(function(x) sapply(letters, gregexpr, x, fixed = TRUE))%>%
+  unlist%>%
+  (function(x) x[x!=-1])%>%
+  (function(x) setNames(x, gsub("\\d", "", names(x))))%>%
+  (function(x) apply(table(data.frame(letter = toupper(names(x)),
+                                      position = unname(x))),
+                     1, function(y) y/length(x)))%>%
+  qheat(high = "red", low = "yellow", by.column = NULL,
+        values = TRUE, digits = 3, plot = FALSE)+
+  ylab("Letter")+
+  xlab("Position")+
+  theme(axis.text.x = element_text(angle = 0))+
+  guides(fill = guide_legend(title = "Proportion"))
+
+```
+
