@@ -1,0 +1,755 @@
+---
+title: "Untitled"
+author: "DJM"
+date: "November 16, 2015"
+output: html_document
+---
+Using TM package vignette
+```{r}
+setwd("~/R/capstone/capstone") #set directory where files are located directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 5000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+path <-"yelp_academic_dataset_business.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000) #read data only 5000 read
+bus <- lapply(X=lines, fromJSON) #convert json to r
+class(bus) #check that bus file is a list
+length(bus) #verify 5000 file was actually copied
+
+#create a function to select objects from  bus. file
+jsearch <- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info <- list(obj$business_id,
+                   obj$name,
+                   obj$categories,
+                   obj$stars,
+                   obj$review_count,
+                   obj$state)
+   
+      return(info)
+      break
+    }
+  }
+}
+
+#create empty dataframe
+df <- data.frame(businesss_id = as.character(),
+                 names = as.character(),
+                  category = as.character(),
+                 stars = as.numeric(),
+                 review_count = as.numeric(),
+                 state = as.character())
+                
+#search bus file
+i <- 1
+j <- 1
+for(d in bus){
+  
+  business_id<- as.character(jsearch(bus, d[[1]])[1])
+  names <- as.character(jsearch(bus, d[[1]])[2])
+  category <- as.character(jsearch(bus, d[[1]])[3])
+  stars <- as.numeric(jsearch(bus, d[[1]])[4])
+  review_count <- as.numeric(jsearch(bus, d[[1]])[5])
+  state <- as.character(jsearch(bus, d[[1]])[6])
+  
+  
+    entry <- data.frame(business_id,
+                        names,
+                        category,
+                        stars,
+                        review_count,
+                        state)
+#create new dataframe with search objects    
+    df <- rbind(df, entry)
+    i <- i + 1
+    print(i)
+  
+  print(paste("business processed..!", j))
+  j <- j + 1
+}
+#save dataframe
+write.csv(df, file = "yelp_business.csv", row.names = F)
+#read csv
+business.df<- read.csv("yelp_business.csv")
+
+
+
+path <-  "yelp_academic_dataset_tip.json" 
+con <- file(path, "r")
+lines <- readLines(con, n = 5000)
+tips <- lapply(X=lines, fromJSON)
+
+tips.df <- do.call(rbind, lapply(tips, as.data.frame))
+write.csv(tips.df, file = "yelp_tips.csv", row.names = F)
+
+
+path <-  "yelp_academic_dataset_user.json"
+con <- file(path, "r")
+lines <- readLines(con, n = 5000)
+user <- lapply(X=lines, fromJSON)
+
+jsearch2<- function(json, uid){
+  for(obj in json){
+    if(obj$user_id == uid){
+      info2 <- list(obj$user_id,
+                    obj$votes,
+                    obj$average_stars,
+                    obj$review_count,
+                    obj$friends)
+                    
+      return(info2)
+      break
+    }
+  }
+}
+
+
+df2 <- data.frame(user_id = as.character(),
+                  votes = as.character(),
+                  average_stars = as.numeric(),
+                  review_count = as.numeric(),
+                  friends = as.character())
+
+
+m <- 1
+n <- 1
+for(e in user){
+
+  user_id<- as.character(jsearch2(user, e[[5]])[1])
+  votes <- as.character(jsearch2(user, e[[5]])[2])
+  average_stars <- as.numeric(jsearch2(user, e[[5]])[3])
+  review_count <- as.numeric(jsearch2(user, e[[5]])[4])
+  friends <- as.character(jsearch2(user, e[[5]])[5])
+  
+    entry2 <- data.frame(user_id,
+                         votes,
+                         average_stars,
+                         review_count,
+                         friends)
+                         
+                        
+    
+    df2<- rbind(df2, entry2)
+    m <- m + 1
+    print(m)
+  
+  print(paste("user processed..!", n))
+  n <- n + 1
+}
+
+write.csv(df2, file = "yelp_user.csv")
+user.df<- read.csv("yelp_user.csv")
+
+
+```
+
+```{r}
+library(dplyr)
+review2.df <- select(review.df, business_id,
+                     stars, text)
+business2.df <- select(business.df,business_id,
+                       names)
+merge.df <- merge(review2.df, business2.df,
+                 'business_id')
+tip2.df <- select(tips.df, business_id,
+                  tip)
+merge2.df <- merge(merge.df, tip2.df,
+                   'business_id')
+
+merge2.df$stars <- factor(merge2.df$stars,
+                             levels = c('1', '2', '3',
+                                        '4', '5'),
+                             labels = c("one",
+                                        "two",
+                                        "three",
+                                        "four",
+                                        "five"))
+
+names(merge2.df)[names(merge2.df)=="text.x"] <- "review"
+names(merge2.df)[names(merge2.df)=="text.y"] <- "tips"       
+
+                    
+count_bus_id <- count(merge2.df,business_id)
+
+count <- arrange(count_bus_id, desc(n))
+head(count)
+
+data2 <- merge2.df[merge2.df$business_id %in%
+                    c("2X5G4Ujq0s4Wfn4TC7gX0g"),]
+table(data2$stars)
+
+```
+
+```{r}
+library(dplyr)
+review_stars <- arrange(data2, stars) # arrange stars in order
+
+worst <- filter(review_stars, stars == 'one')
+bad <- filter(review_stars, stars == 'two')
+okay <- filter(review_stars, stars == 'three')
+better <- filter(review_stars, stars == 'four')
+best <- filter(review_stars, stars == 'five')
+
+```
+
+#worst
+```{r}
+library(tm) #package used to word with text
+worst_text <- as.list(worst$text) #create a list of text only
+worst_corpus <- Corpus(VectorSource(worst_text)) 
+worst_corpus <- tm_map(worst_corpus,content_transformer(tolower)) #change all letters to lower case
+worst_corpus <- tm_map(worst_corpus, PlainTextDocument) #need to change data into something to work with 
+worst_corpus <- tm_map(worst_corpus, removePunctuation) #self explanatory
+worst_corpus <- tm_map(worst_corpus, removeNumbers)
+worst_corpus <- tm_map(worst_corpus, stripWhitespace)
+worst_corpus <- tm_map(worst_corpus,
+                        function(x) removeWords(x, stopwords("SMART"))) # remove common words such as 'a'
+library(wordcloud)
+par(mfrow=c(3,2))
+wordcloud(worst_corpus, 
+          random.order = FALSE) #create wordcloud
+
+worst_dtm <- DocumentTermMatrix(worst_corpus)
+worst_dtm
+dim(worst_dtm)
+Zipf_plot(worst_dtm, type = 'l')
+```
+
+#bad
+```{r}
+library(tm) #package used to word with text
+bad_text <- as.list(bad$text) #create a list of text only
+bad_corpus <- Corpus(VectorSource(bad_text)) 
+bad_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+bad_corpus <- tm_map(bad_corpus, PlainTextDocument) #need to change data into something to work with 
+bad_corpus <- tm_map(bad_corpus, removePunctuation) #self explanatory
+bad_corpus <- tm_map(bad_corpus, removeNumbers)
+bad_corpus <- tm_map(bad_corpus, stripWhitespace)
+bad_corpus <- tm_map(bad_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+wordcloud(bad_corpus, min.freq= 500,
+          max.words = 300,
+          color = brewer.pal(10, 'BuPu'),
+          random.order = FALSE) #create wordcloud
+
+bad_dtm <- DocumentTermMatrix(bad_corpus)
+bad_dtm
+dim(bad_dtm)
+Zipf_plot(bad_dtm, type = 'l')
+```
+#okay
+```{r}
+library(tm) #package used to word with text
+okay_text <- as.list(okay$text) #create a list of text only
+okay_corpus <- Corpus(VectorSource(okay_text)) 
+okay_corpus <- tm_map(okay_corpus,content_transformer(tolower)) #change all letters to lower case
+okay_corpus <- tm_map(okay_corpus, PlainTextDocument) #need to change data into something to work with 
+okay_corpus <- tm_map(okay_corpus, removePunctuation) #self explanatory
+okay_corpus <- tm_map(okay_corpus, removeNumbers)
+okay_corpus <- tm_map(okay_corpus, stripWhitespace)
+okay_corpus <- tm_map(okay_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+wordcloud(okay_corpus, min.freq= 5,
+          color = brewer.pal(9, "PuBuGn"),
+          random.order = FALSE) #create wordcloud
+
+okay_dtm <- DocumentTermMatrix(okay_corpus)
+okay_dtm
+dim(okay_dtm)
+Zipf_plot(okay_dtm, type = 'l')
+```
+#better
+```{r}
+library(tm) #package used to word with text
+better_text <- as.list(better$text) #create a list of text only
+better_corpus <- Corpus(VectorSource(better_text)) 
+better_corpus <- tm_map(better_corpus,content_transformer(tolower)) #change all letters to lower case
+better_corpus <- tm_map(better_corpus, PlainTextDocument) #need to change data into something to work with 
+better_corpus <- tm_map(better_corpus, removePunctuation) #self explanatory
+better_corpus <- tm_map(better_corpus, removeNumbers)
+better_corpus <- tm_map(better_corpus, stripWhitespace)
+better_corpus <- tm_map(better_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+wordcloud(better_corpus, min.freq= 5,
+          color = brewer.pal(10, "YlOrBr"),
+          random.order = FALSE) #create wordcloud
+
+better_dtm <- DocumentTermMatrix(better_corpus)
+better_dtm
+dim(better_dtm)
+Zipf_plot(better_dtm, type = 'l')
+```
+
+#Best
+```{r}
+library(tm) #package used to word with text
+best_text <- as.list(best$text) #create a list of text only
+best_corpus <- Corpus(VectorSource(best_text)) 
+best_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+best_corpus <- tm_map(best_corpus, PlainTextDocument) #need to change data into something to work with 
+best_corpus <- tm_map(best_corpus, removePunctuation) #self explanatory
+best_corpus <- tm_map(best_corpus, removeNumbers)
+best_corpus <- tm_map(best_corpus, stripWhitespace)
+best_corpus <- tm_map(best_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+ 
+wordcloud(best_corpus, min.freq= 500,
+          max.word = 300,
+          color =  brewer.pal(8, "Dark2"),
+          random.order = FALSE) #create wordcloud
+
+best_dtm <- DocumentTermMatrix(best_corpus)
+best_dtm
+dim(best_dtm)
+Zipf_plot(best_dtm, type = 'l')
+```
+Exploring
+```{r}
+worst_freq <- colSums(as.matrix(worst_dtm))
+length(worst_freq)
+worst_order <- order(worst_freq)
+#Least frequent terms
+worst_freq[head(worst_order)]
+#Most frequent terms
+worst_freq[tail(worst_order)]
+
+worst.freq <- sort(colSums(as.matrix(worst_dtm)),
+             decreasing = TRUE)
+head(worst.freq)
+wf <- data.frame(word = names(worst.freq), worst.freq = worst.freq)
+head(wf)
+
+library(ggplot2)
+subset(wf, worst.freq > 100)%>%
+  ggplot(aes(word, worst.freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+
+library(qdap)
+worstwords <- worst_dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(worstwords)
+head(worstwords)
+summary(nchar(worstwords))
+table(nchar(worstwords))
+dist_tab(nchar(worstwords))
+
+worst_dtms <- removeSparseTerms(worst_dtm, 0.9)
+dim(worst_dtms)
+worst_dtms
+freq <- colSums(as.matrix(worst_dtms))
+freq
+table(freq)
+
+findFreqTerms(worst_dtms, lowfreq = 25)
+findAssocs(worst_dtms, "beer", corlimit = 0.25)
+findAssocs(worst_dtms, "waiter", corlimit = .25)
+
+## try http:// if https:// URLs are not supported
+##source("https://bioconductor.org/biocLite.R")
+##biocLite("Rgraphviz")
+library(Rgraphviz)
+browseVignettes("Rgraphviz")
+plot(worst_dtms, terms = findFreqTerms(worst_dtms, lowfreq = 125), corThreshold = 0.50)
+
+bad_freq <- colSums(as.matrix(bad_dtm))
+length(bad_freq)
+bad_order <- order(bad_freq)
+#Least frequent terms
+bad_freq[head(bad_order)]
+#Most frequent terms
+bad_freq[tail(bad_order)]
+
+bad.freq <- sort(colSums(as.matrix(bad_dtm)),
+             decreasing = TRUE)
+head(bad.freq)
+baddf <- data.frame(word = names(bad.freq), bad.freq = bad.freq)
+head(baddf)
+
+library(ggplot2)
+subset(baddf, bad.freq > 100)%>%
+  ggplot(aes(word, bad.freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+
+library(qdap)
+badwords <- bad_dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(badwords)
+head(badwords)
+summary(nchar(badwords))
+table(nchar(badwords))
+dist_tab(nchar(badwords))
+
+bad_dtms <- removeSparseTerms(bad_dtm, 0.9)
+dim(bad_dtms)
+bad_dtms
+bad_freq <- colSums(as.matrix(bad_dtms))
+bad_freq
+table(bad_freq)
+
+findFreqTerms(bad_dtms, lowfreq = 25)
+findAssocs(bad_dtms, "beer", corlimit = 0.25)
+findAssocs(bad_dtms, "waiter", corlimit = .25)
+
+## try http:// if https:// URLs are not supported
+##source("https://bioconductor.org/biocLite.R")
+##biocLite("Rgraphviz")
+library(Rgraphviz)
+browseVignettes("Rgraphviz")
+plot(bad_dtms, terms = findFreqTerms(bad_dtms, lowfreq = 225), corThreshold = 0.50)
+
+okay_freq <- colSums(as.matrix(okay_dtm))
+length(okay_freq)
+okay_order <- order(okay_freq)
+#Least frequent terms
+okay_freq[head(okay_order)]
+#Most frequent terms
+okay_freq[tail(okay_order)]
+
+okay.freq <- sort(colSums(as.matrix(okay_dtm)),
+             decreasing = TRUE)
+head(okay.freq)
+okaydf <- data.frame(word = names(okay.freq), okay.freq = okay.freq)
+head(okaydf)
+
+library(ggplot2)
+subset(okaydf, okay.freq > 350)%>%
+  ggplot(aes(word, okay.freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+
+library(qdap)
+okaywords <- okay_dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(okaywords)
+head(okaywords)
+summary(nchar(okaywords))
+table(nchar(okaywords))
+dist_tab(nchar(okaywords))
+
+okay_dtms <- removeSparseTerms(okay_dtm, 0.9)
+dim(okay_dtms)
+okay_dtms
+okay_freq <- colSums(as.matrix(okay_dtms))
+okay_freq
+table(okay_freq)
+
+findFreqTerms(okay_dtms, lowfreq = 25)
+findAssocs(okay_dtms, "beer", corlimit = 0.25)
+findAssocs(okay_dtms, "tasty", corlimit = .25)
+
+## try http:// if https:// URLs are not supported
+##source("https://bioconductor.org/biocLite.R")
+##biocLite("Rgraphviz")
+library(Rgraphviz)
+browseVignettes("Rgraphviz")
+plot(okay_dtms, terms = findFreqTerms(okay_dtms, lowfreq = 500), corThreshold = 0.25)
+
+better_freq <- colSums(as.matrix(better_dtm))
+length(better_freq)
+better_order <- order(better_freq)
+#Least frequent terms
+better_freq[head(better_order)]
+#Most frequent terms
+better_freq[tail(better_order)]
+
+better.freq <- sort(colSums(as.matrix(better_dtm)),
+             decreasing = TRUE)
+head(better.freq)
+betterdf <- data.frame(word = names(better.freq), better.freq = better.freq)
+head(betterdf)
+
+library(ggplot2)
+subset(betterdf, better.freq > 1000)%>%
+  ggplot(aes(word, better.freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+
+library(qdap)
+betterwords <- better_dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(betterwords)
+head(betterwords)
+summary(nchar(betterwords))
+table(nchar(betterwords))
+dist_tab(nchar(betterwords))
+
+better_dtms <- removeSparseTerms(better_dtm, 0.9)
+dim(better_dtms)
+better_dtms
+better_freq <- colSums(as.matrix(better_dtms))
+better_freq
+table(better_freq)
+
+findFreqTerms(better_dtms, lowfreq = 25)
+findAssocs(better_dtms, "beer", corlimit = 0.25)
+findAssocs(better_dtms, "waiter", corlimit = .25)
+
+## try http:// if https:// URLs are not supported
+##source("https://bioconductor.org/biocLite.R")
+##biocLite("Rgraphviz")
+library(Rgraphviz)
+browseVignettes("Rgraphviz")
+plot(better_dtms, terms = findFreqTerms(better_dtms, lowfreq = 1500), corThreshold = 0.25)
+
+best_freq <- colSums(as.matrix(best_dtm))
+length(best_freq)
+best_order <- order(best_freq)
+#Least frequent terms
+best_freq[head(best_order)]
+#Most frequent terms
+best_freq[tail(best_order)]
+
+best.freq <- sort(colSums(as.matrix(best_dtm)),
+             decreasing = TRUE)
+head(best.freq)
+bestdf <- data.frame(word = names(best.freq), best.freq = best.freq)
+head(bestdf)
+
+library(ggplot2)
+subset(bestdf, best.freq > 100)%>%
+  ggplot(aes(word, best.freq))+
+  geom_bar(stat = "identity")+
+  theme(axis.text.x = element_text(angle = 45))
+
+library(qdap)
+bestwords <- best_dtm %>%
+  as.matrix %>%
+  colnames %>%
+  (function(x) x[nchar(x) < 20])
+length(bestwords)
+head(bestwords)
+summary(nchar(bestwords))
+table(nchar(bestwords))
+dist_tab(nchar(bestwords))
+
+best_dtms <- removeSparseTerms(best_dtm, 0.9)
+dim(best_dtms)
+best_dtms
+best_freq <- colSums(as.matrix(best_dtms))
+best_freq
+table(best_freq)
+
+findFreqTerms(best_dtms, lowfreq = 25)
+findAssocs(best_dtms, "beer", corlimit = 0.25)
+findAssocs(best_dtms, "waiter", corlimit = .25)
+
+## try http:// if https:// URLs are not supported
+##source("https://bioconductor.org/biocLite.R")
+##biocLite("Rgraphviz")
+library(Rgraphviz)
+browseVignettes("Rgraphviz")
+plot(best_dtms, terms = findFreqTerms(best_dtms, lowfreq = 200), corThreshold = 0.50)
+```
+
+
+```{r}
+library(tm)
+str(merge2.df)
+review_source <- Corpus(VectorSource(merge2.df$text))
+
+getTransformations()
+
+
+corpus <- tm_map(review_source, content_transformer(tolower))
+corpus <- tm_map(corpus, PlainTextDocument)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("SMART"))
+
+stopwords('SMART')#see list of words removed
+
+dtm <- DocumentTermMatrix(corpus)
+dtms <- removeSparseTerms(dtm, sparse = .90)
+dtmatrix <- as.matrix(dtms)
+frequency <- colSums(dtmatrix)
+frequency <- sort(frequency, decreasing = TRUE)
+head(frequency)
+tail(frequency)
+
+library(wordcloud)
+words <- names(frequency)
+wordcloud(words[1:10], frequency[1:10])
+
+raw_train <- merge2.df[1:50513,]
+raw_test <- merge2.df[50514:72162,]
+                                 
+dtm_train <- dtms[1:50513,]
+dtm_test <- dtms[50514:72162,]
+
+corpus_train <- corpus[1:50513]
+corpus_test <- corpus[501514:72162]
+```
+#wordcloud
+```{r}
+library(wordcloud)
+wordcloud(corpus_train, max.words = 40,
+          random.order = FALSE,
+          random.color = TRUE)
+```
+
+#Data Preparation
+```{r}
+Dictionary <- findFreqTerms(dtm_train, 5)
+
+review_train <- TermDocumentMatrix(corpus_train,                        list(dictionary=Dictionary))
+
+review_test <- TermDocumentMatrix(corpus_test,
+                list(dictionary = Dictionary))
+
+convert_counts <- function(x){
+  x <- ifelse(x > 0, 1, 0)
+  x <- factor(x, levels = c(0, 1),
+              labels = c('"No"', '"Yes"'))
+  return(x)
+}
+```
+
+##Naive Bayes
+```{r}
+review_train <- apply(review_train,MARGIN = 1,
+                      convert_counts)
+review_test <- apply(review_test, MARGIN = 1,
+                     convert_counts)
+
+library(e1071)
+star_classifier <- naiveBayes(review_train,
+                              stars_raw_train$stars,
+                              laplace = 1)
+star_test_predict <- predict(star_classifier,
+                             review_test)
+library(gmodels)
+CrossTable(star_test_predict,
+           stars_raw_test$stars,
+           prop.chisq = TRUE,
+           prop.t = TRUE,
+           dnn = c("predicted", "actual"))
+
+sparse.tdm <- removeSparseTerms(dtm, sparse = 0.85)
+inspect(sparse.tdm)
+sparse_review_scale <- scale(sparse.tdm)
+review_dist <- dist(sparse_review_scale, method = "euclidean")
+review_fit <- hclust(review_dist, method = "ward.D2")
+plot(review_fit, main = "Cluster - Yelp Review")
+groups <- cutree(review_fit, k = 50)
+rect.hclust(review_fit, k =5, border = "blue")
+
+```
+
+```{r}
+https_function <- function(url, ...){
+  require(RCurl)
+  
+  sapply(c(url, ...), function(u){
+    eval(parse(text = getURL(u, followlocation = TRUE,
+                             cainf = system.file("CurlSSL",
+                                                 "cacert.pem",
+                                                 package = "RCurl"))),
+         envir = .GlobalEnv)
+  })
+}
+
+
+```
+
+#sentiment function
+```{r}
+score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
+{
+  require(plyr)
+	require(stringr)
+
+	scores = laply(sentences, function(sentence, pos.words, neg.words) {
+    
+		word.list = str_split(sentence, '\\s+')
+		words = unlist(word.list)
+    
+		pos.matches = match(words, pos.words)
+		neg.matches = match(words, neg.words)
+	
+		pos.matches = !is.na(pos.matches)
+		neg.matches = !is.na(neg.matches)
+
+		score = sum(pos.matches) - sum(neg.matches)
+
+		return(score)
+	}, pos.words, neg.words, .progress=.progress )
+
+	scores.df = data.frame(score=scores, text=sentences)
+	return(scores.df)
+}
+
+if(!file.exists('neg_words')){
+  dir.create("neg_words")
+}
+
+url <- "https://github.com/SocialMediaMininginR/neg_words/blob/master/negative-words.txt"
+download.file(url, destfile = "./neg_words.txt", method = "curl")
+
+fileurl <- "https://github.com/SocialMediaMininginR/neg_words/blob/master/LoughranMcDonald_neg.csv"
+download.file(fileurl, destfile = "./LoughranMcDonald_neg.txt", method = "curl")
+
+URL <- 'https://github.com/SocialMediaMininginR/pos_words/blob/master/positive-words.txt'
+download.file(URL, destfile = "./pos_words.txt", method = "curl")
+
+fileURL <- "https://github.com/SocialMediaMininginR/pos_words/blob/master/LoughranMcDonald_pos.csv"
+download.file(fileurl, destfile = "./LoughranMcDonald_pos.txt", method = "curl")
+
+pos <- scan(file.path("/Users/surfsup/Desktop/coursera /capstone/yelp_dataset_challenge_academic_dataset",
+  'pos_words.txt'), what = 'character', comment.char = ";")
+
+pos_finance <- scan(file.path("/Users/surfsup/Desktop/coursera /capstone/yelp_dataset_challenge_academic_dataset",
+                              'LoughranMcDonald_pos.txt'),
+                    what = 'character', comment.char = ";")
+pos_all <- c(pos, pos_finance)
+
+neg <- scan(file.path("/Users/surfsup/Desktop/coursera /capstone/yelp_dataset_challenge_academic_dataset",
+                      'neg_words.txt'),
+            what = 'character', comment.char = ";")
+neg_finance <- scan(file.path("/Users/surfsup/Desktop/coursera /capstone/yelp_dataset_challenge_academic_dataset",
+                              'LoughranMcDonald_neg.txt'),
+                    what = "character", comment.char = ";")
+
+neg_all <- c(neg, neg_finance)
+
+colnames(review.df)
+library(reshape)
+cast(review.df, stars~votes.funny, length)
+
+bad <- is.na(review.df)
+review.df[bad]
+review.df$text <- gsub('[[:punct:]]', ' ', review.df$text)
+review.df$text <- gsub('[[:cntrl:]]', ' ', review.df$text)
+review.df$text <- gsub('\\d+', ' ', review.df$text)
+review.text <- as.data.frame(review.df$text)
+review.text$year <- review.df$year
+review.text$date <- as.Date(paste(review.df$year,
+                                  review.df$month,
+                                  review.df$day,
+                                  sep = "-"),
+                            format = "%Y-%m-%d")
+```
