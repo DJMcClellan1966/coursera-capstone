@@ -602,7 +602,7 @@ dtm_train <- dtms[1:50513,]
 dtm_test <- dtms[50514:72162,]
 
 corpus_train <- corpus[1:50513]
-corpus_test <- corpus[501514:72162]
+corpus_test <- corpus[50514:72162]
 ```
 #wordcloud
 ```{r}
@@ -616,10 +616,10 @@ wordcloud(corpus_train, max.words = 40,
 ```{r}
 Dictionary <- findFreqTerms(dtm_train, 5)
 
-review_train <- TermDocumentMatrix(corpus_train,                        list(dictionary=Dictionary))
+review_train <- TermDocumentMatrix(corpus_train,                                     list(dictionary=Dictionary))
 
 review_test <- TermDocumentMatrix(corpus_test,
-                list(dictionary = Dictionary))
+               list(dictionary = Dictionary))
 
 convert_counts <- function(x){
   x <- ifelse(x > 0, 1, 0)
@@ -638,13 +638,13 @@ review_test <- apply(review_test, MARGIN = 1,
 
 library(e1071)
 star_classifier <- naiveBayes(review_train,
-                              stars_raw_train$stars,
+                              raw_train$stars,
                               laplace = 1)
 star_test_predict <- predict(star_classifier,
                              review_test)
 library(gmodels)
 CrossTable(star_test_predict,
-           stars_raw_test$stars,
+           raw_test$stars,
            prop.chisq = TRUE,
            prop.t = TRUE,
            dnn = c("predicted", "actual"))
