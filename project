@@ -1,0 +1,48 @@
+---
+title: "Using Naive Bayes to predict ratings based on Yelp reviews"
+author: "DJMcClellan"
+date: "November 18, 2015"
+output: html_document
+---
+#Introduction
+This project uses the [Yelp Challenge Database](http://www.yelp.com/dataset_challenge) to predict star ratings from Yelp reviews.  Users reviews can bias a person to go or not to go to an establishment, stars are an easy reference to a review.  But is there any way to read a review and guess the rating, most times a review is positive or negative but the stars don't represent the review, I want to find out if I am being overly critical or the stars and ratings do match up.
+
+##Methods and Data
+I downloaded the dataset to my local computer and created 4 dataframes reviews, business, tips, and users.  I only downloaded 5000 lines to keep the data manageable.  
+```{r}
+str(review.df)
+str(business.df)
+str(tips.df)
+str(user.df)
+```
+Using these datasets I created a combined dataset called data2, I only used 1 business to rate and review
+```{r}
+str(data2)
+```
+To be honest I really focused on the methods over the data, I got caught up in using different packages on the data.  The main ones were:
+
+    *[tm](https://cran.r-project.org/web/packages/tm/tm.pdf)
+    *[qdap](http://127.0.0.1:20123/library/qdap/html/qdap.html)
+    *[dpylr](http://127.0.0.1:20123/library/dplyr/html/dplyr.html)
+    *[ggplot](http://127.0.0.1:20123/library/ggplot2/html/ggplot.html)
+    *[rgraphviz](http://127.0.0.1:20123/session/Rvig.208a2dae844f.html)
+    *[wordcloud](http://127.0.0.1:20123/library/wordcloud/html/wordcloud.html)
+    
+I was happy to learn new ways of working with data and r, but my grasp of the data suffered, hopefully we can learn something about the data together.
+I created wordclouds based on the 5 different star ratings.
+```{r,echo=FALSE}
+library(wordcloud)
+
+wordcloud(worst_corpus, min.freq = 500,
+          max.word = 50,
+          color = brewer.pal(9,"Greys"),
+          random.order = FALSE) #create wordcloud
+
+
+wordcloud(best_corpus, min.freq= 500,
+          max.word = 50,
+          color =  brewer.pal(8, "Dark2"),
+          random.order = FALSE) #create wordcloud
+
+
+```
