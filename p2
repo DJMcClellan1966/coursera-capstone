@@ -1,0 +1,312 @@
+---
+title: "Using Naive Bayes and sentiment analysis to predict Yelp dataset reviews"
+author: "DJM"
+date: "November 19, 2015"
+output: html_document
+---
+#Introduction
+In this project I used data from the [Yelp Dataset Challenge](http://www.yelp.com/dataset_challenge) along with knowledge learned from Coursera Data Science course. The purpose of this study was to take user reviews and star ratings and using text mining and Naive Bayes try and predict the number of stars from the reviews. While also learning what makes a 4 star review different from a 5 star review or a 1 from a 2 star.
+
+##Methods and Data
+I began by creating 4 dataframes: 
+
+      1.business
+      2.review
+      3.user
+      4.tips
+      
+Using a variety of r packages, especially tm, qdap, dplyr, and wordcloud to explore the data .
+```{r,echo=FALSE}
+setwd("~/R/capstone/capstone") #set directory where files are located directory where files are located
+rm(list=ls())  #remove any old files for clarity
+library(rjson) #yelp data is in json format
+path <- "yelp_academic_dataset_review.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000)  #read data as lines since it is so large only read 5000 lines       
+review <- lapply(X = lines, fromJSON) #convert json to r language
+
+class(review) # look at data to verify
+length(review) #make sure that actually got all the data requested
+review.df <- do.call(rbind, lapply(review, as.data.frame)) #convert to dataframe
+write.csv(review.df, file = "yelp_review.csv", row.names = F) #create csv file
+
+path <-"yelp_academic_dataset_business.json" #create path to file
+con <- file(path, "r") #connect to file
+lines <- readLines(con, n = 5000) #read data only 5000 read
+bus <- lapply(X=lines, fromJSON) #convert json to r
+class(bus) #check that bus file is a list
+length(bus) #verify 5000 file was actually copied
+
+#create a function to select objects from  bus. file
+jsearch <- function(json, bid){
+  for(obj in json){
+    if(obj$business_id == bid){
+      info <- list(obj$business_id,
+                   obj$name,
+                   obj$categories,
+                   obj$stars,
+                   obj$review_count,
+                   obj$state)
+   
+      return(info)
+      break
+    }
+  }
+}
+
+#create empty dataframe
+df <- data.frame(businesss_id = as.character(),
+                 names = as.character(),
+                  category = as.character(),
+                 stars = as.numeric(),
+                 review_count = as.numeric(),
+                 state = as.character())
+                
+#search bus file
+i <- 1
+j <- 1
+for(d in bus){
+  
+  business_id<- as.character(jsearch(bus, d[[1]])[1])
+  names <- as.character(jsearch(bus, d[[1]])[2])
+  category <- as.character(jsearch(bus, d[[1]])[3])
+  stars <- as.numeric(jsearch(bus, d[[1]])[4])
+  review_count <- as.numeric(jsearch(bus, d[[1]])[5])
+  state <- as.character(jsearch(bus, d[[1]])[6])
+  
+  
+    entry <- data.frame(business_id,
+                        names,
+                        category,
+                        stars,
+                        review_count,
+                        state)
+#create new dataframe with search objects    
+    df <- rbind(df, entry)
+    
+}
+#save dataframe
+write.csv(df, file = "yelp_business.csv", row.names = F)
+#read csv
+business.df<- read.csv("yelp_business.csv")
+
+
+
+path <-  "yelp_academic_dataset_tip.json" #create path to file
+con <- file(path, "r") #create connection
+lines <- readLines(con, n = 5000) #read only 5000 lines of data
+tips <- lapply(X=lines, fromJSON) # create list of data
+
+tips.df <- do.call(rbind, lapply(tips, as.data.frame)) #create dataframe
+write.csv(tips.df, file = "yelp_tips.csv", row.names = F) #save dataframe as csv
+
+
+path <-  "yelp_academic_dataset_user.json" #create path to data
+con <- file(path, "r") #create connection
+lines <- readLines(con, n = 5000) # read only 5000 lines of data
+user <- lapply(X=lines, fromJSON) #convert rjson file to list
+
+#create search function
+jsearch2<- function(json, uid){
+  for(obj in json){
+    if(obj$user_id == uid){
+      info2 <- list(obj$user_id,
+                    obj$votes,
+                    obj$average_stars,
+                    obj$review_count,
+                    obj$friends)
+                    
+      return(info2)
+      break
+    }
+  }
+}
+
+#create empty data frame
+df2 <- data.frame(user_id = as.character(),
+                  votes = as.character(),
+                  average_stars = as.numeric(),
+                  review_count = as.numeric(),
+                  friends = as.character())
+
+#search data
+m <- 1
+n <- 1
+for(e in user){
+
+  user_id<- as.character(jsearch2(user, e[[5]])[1])
+  votes <- as.character(jsearch2(user, e[[5]])[2])
+  average_stars <- as.numeric(jsearch2(user, e[[5]])[3])
+  review_count <- as.numeric(jsearch2(user, e[[5]])[4])
+  friends <- as.character(jsearch2(user, e[[5]])[5])
+  
+    entry2 <- data.frame(user_id,
+                         votes,
+                         average_stars,
+                         review_count,
+                         friends)
+                         
+                        
+    #make new dataframe with search data
+    df2<- rbind(df2, entry2)
+   
+}
+
+write.csv(df2, file = "yelp_user.csv") #save dataframe
+user.df<- read.csv("yelp_user.csv") # read csv
+
+```
+Since it was a large amount of data, I choose to focus on a small part of the data specifically 1 business with id "2X5G4Ujq0s4Wfn4TC7gX0g".
+```{r,echo=FALSE}
+library(dplyr)
+
+review2.df <- select(review.df, business_id,
+                     stars, text)# choosing variables from review
+business2.df <- select(business.df,business_id,
+                       names) # choosing variables from business
+merge.df <- merge(review2.df, business2.df,
+                 'business_id') #combining selected dataframes into one using business id
+tip2.df <- select(tips.df, business_id,
+                  text) # choosing variable from tip df for variety
+merge2.df <- merge(merge.df, tip2.df,
+                   'business_id') # merge into final df
+
+merge2.df$stars <- factor(merge2.df$stars,
+                             levels = c('1', '2', '3',
+                                        '4', '5'),
+                             labels = c("one",
+                                        "two",
+                                        "three",
+                                        "four",
+                                        "five")) #convert stars variable from numeric to factor for later use
+
+names(merge2.df)[names(merge2.df)=="text.x"] <- "review" #rename column
+names(merge2.df)[names(merge2.df)=="text.y"] <- "tips"   #rename column    
+
+                    
+count_bus_id <- count(merge2.df,business_id) # count number of unique business id
+
+count <- arrange(count_bus_id, desc(n)) #arrange count
+head(count) 
+
+data2 <- merge2.df[merge2.df$business_id %in%
+                    c("2X5G4Ujq0s4Wfn4TC7gX0g"),] #select business that occurs the most
+table(data2$stars)
+
+```
+I created a variety of word clouds for comparison 
+```{r,echo=FALSE}
+review_stars <- arrange(data2, stars) # arrange stars in order
+
+#create 5 separate data frames based on star ratings
+worst <- filter(review_stars, stars == 'one')
+bad <- filter(review_stars, stars == 'two')
+okay <- filter(review_stars, stars == 'three')
+better <- filter(review_stars, stars == 'four')
+best <- filter(review_stars, stars == 'five')
+
+#worst
+library(tm) #package used to word with text
+worst_text <- as.list(worst$review) #create a list of text only
+worst_corpus <- Corpus(VectorSource(worst_text)) 
+worst_corpus <- tm_map(worst_corpus,content_transformer(tolower)) #change all letters to lower case
+worst_corpus <- tm_map(worst_corpus, PlainTextDocument) #need to change data into something to work with 
+worst_corpus <- tm_map(worst_corpus, removePunctuation) #next 3 self explanatory
+worst_corpus <- tm_map(worst_corpus, removeNumbers)
+worst_corpus <- tm_map(worst_corpus, stripWhitespace)
+worst_corpus <- tm_map(worst_corpus,
+                        function(x) removeWords(x, stopwords("SMART"))) # remove common words such as 'a'
+library(wordcloud)
+wordcloud(worst_corpus, min.freq = 1000,
+          max.words = 50,
+          random.order = FALSE) #create wordcloud
+#BAD
+library(tm) #package used to word with text
+bad_text <- as.list(bad$review) #create a list of text only
+bad_corpus <- Corpus(VectorSource(bad_text)) 
+bad_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+bad_corpus <- tm_map(bad_corpus, PlainTextDocument) #need to change data into something to work with 
+bad_corpus <- tm_map(bad_corpus, removePunctuation) #self explanatory
+bad_corpus <- tm_map(bad_corpus, removeNumbers)
+bad_corpus <- tm_map(bad_corpus, stripWhitespace)
+bad_corpus <- tm_map(bad_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+#OKAY
+library(tm) #package used to word with text
+okay_text <- as.list(okay$review) #create a list of text only
+okay_corpus <- Corpus(VectorSource(okay_text)) 
+okay_corpus <- tm_map(okay_corpus,content_transformer(tolower)) #change all letters to lower case
+okay_corpus <- tm_map(okay_corpus, PlainTextDocument) #need to change data into something to work with 
+okay_corpus <- tm_map(okay_corpus, removePunctuation) #self explanatory
+okay_corpus <- tm_map(okay_corpus, removeNumbers)
+okay_corpus <- tm_map(okay_corpus, stripWhitespace)
+okay_corpus <- tm_map(okay_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+#BETTER
+library(tm) #package used to word with text
+better_text <- as.list(better$review) #create a list of text only
+better_corpus <- Corpus(VectorSource(better_text)) 
+better_corpus <- tm_map(better_corpus,content_transformer(tolower)) #change all letters to lower case
+better_corpus <- tm_map(better_corpus, PlainTextDocument) #need to change data into something to work with 
+better_corpus <- tm_map(better_corpus, removePunctuation) #self explanatory
+better_corpus <- tm_map(better_corpus, removeNumbers)
+better_corpus <- tm_map(better_corpus, stripWhitespace)
+better_corpus <- tm_map(better_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+
+
+#best
+library(tm) #package used to word with text
+best_text <- as.list(best$review) #create a list of text only
+best_corpus <- Corpus(VectorSource(best_text)) 
+best_corpus <- tm_map(bad_corpus,content_transformer(tolower)) #change all letters to lower case
+best_corpus <- tm_map(best_corpus, PlainTextDocument) #need to change data into something to work with 
+best_corpus <- tm_map(best_corpus, removePunctuation) #self explanatory
+best_corpus <- tm_map(best_corpus, removeNumbers)
+best_corpus <- tm_map(best_corpus, stripWhitespace)
+best_corpus <- tm_map(best_corpus,
+                        function(x) removeWords(x, stopwords("english"))) # remove common words such as 'a'
+ 
+wordcloud(best_corpus, min.freq= 500,
+          max.word = 50,
+          color =  brewer.pal(8, "Dark2"),
+          random.order = FALSE) #create wordcloud
+ 
+
+```
+Comparing the two wordclouds first from my worst dataframe, the words seem to have more to do with negative feelings about the customers time spent at the restuarant.  The second wordcloud came from my best dataframe and it seems to deal more with the things at the resturant food and service, while not totally positive at least mor postive that the first wordcloud.
+
+Back to my question, what can make the difference between ratings
+```{r,echo=FALSE}
+worst_dtm <- DocumentTermMatrix(worst_corpus)
+worst_dtm
+
+bad_dtm <- DocumentTermMatrix(bad_corpus)
+bad_dtm
+
+worst_freq <- colSums(as.matrix(worst_dtm))
+length(worst_freq)
+worst_order <- order(worst_freq)
+#Least frequent terms
+worst_freq[head(worst_order)]
+#Most frequent terms
+worst_freq[tail(worst_order)]
+
+
+bad_freq <- colSums(as.matrix(bad_dtm))
+length(bad_freq)
+bad_order <- order(bad_freq)
+#Least frequent terms
+bad_freq[head(bad_order)]
+#Most frequent terms
+bad_freq[tail(bad_order)]
+
+plot(worst_dtm, terms = findFreqTerms(worst_dtm, lowfreq = 125),
+     corThreshold = 0.90)
+plot(bad_dtm, terms = findFreqTerms(bad_dtm, lowfreq = 225), corThreshold = 0.50)
+
+```
+
+ 
